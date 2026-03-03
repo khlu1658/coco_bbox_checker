@@ -160,20 +160,18 @@ class CocoViewer(QMainWindow):
         super().resizeEvent(event)
         self._render_current_pixmap()
 
-    def _refresh_view(self, redraw_only: bool = False) -> None:
+    def _refresh_view(self) -> None:
         if not self.images:
             self.status_label.setText("尚未載入 COCO images")
-            if not redraw_only:
-                self.image_label.setText("請載入 COCO JSON")
-                self.image_label.setPixmap(QPixmap())
-                self.current_pixmap = None
+            self.image_label.setText("請載入 COCO JSON")
+            self.image_label.setPixmap(QPixmap())
+            self.current_pixmap = None
             return
         if not self.image_dir:
             self.status_label.setText(f"已載入 JSON，共 {len(self.images)} 張。請選擇圖片資料夾")
-            if not redraw_only:
-                self.image_label.setText("請選擇圖片資料夾")
-                self.image_label.setPixmap(QPixmap())
-                self.current_pixmap = None
+            self.image_label.setText("請選擇圖片資料夾")
+            self.image_label.setPixmap(QPixmap())
+            self.current_pixmap = None
             return
 
         img_info = self.images[self.image_index]
@@ -214,10 +212,13 @@ class CocoViewer(QMainWindow):
 
             name = self.categories.get(anno.category_id, f"cat:{anno.category_id}")
             text = f"{name}"
-            label_bg = QColor(255, 255, 210, 230)
-            painter.fillRect(int(x), max(0, int(y) - 20), 180, 20, label_bg)
+            text_width = painter.fontMetrics().horizontalAdvance(text) + 10
+            label_x = int(x)
+            label_y = max(0, int(y) - 22)
+            label_bg = QColor(255, 255, 210, 235)
+            painter.fillRect(label_x, label_y, text_width, 20, label_bg)
             painter.setPen(QColor(20, 20, 20))
-            painter.drawText(int(x) + 4, max(14, int(y) - 5), text)
+            painter.drawText(label_x + 5, label_y + 15, text)
             painter.setPen(pen)
 
         painter.end()
