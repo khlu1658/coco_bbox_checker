@@ -14,7 +14,6 @@ from PySide6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -48,12 +47,10 @@ class CocoViewer(QMainWindow):
         self.annos_by_image: Dict[int, List[CocoAnno]] = {}
         self.categories: Dict[int, str] = {}
         self.image_index = 0
-        self.current_pixmap: Optional[QPixmap] = None
 
         self.image_label = QLabel("請先載入 COCO JSON 與圖片資料夾")
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setStyleSheet("background:#111; color:#ddd; border:1px solid #333;")
-        self.image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
         self.status_label = QLabel("未載入資料")
 
@@ -158,20 +155,18 @@ class CocoViewer(QMainWindow):
 
     def resizeEvent(self, event) -> None:  # type: ignore[override]
         super().resizeEvent(event)
-        self._render_current_pixmap()
+        self._refresh_view(redraw_only=True)
 
-    def _refresh_view(self) -> None:
+    def _refresh_view(self, redraw_only: bool = False) -> None:
         if not self.images:
             self.status_label.setText("尚未載入 COCO images")
-            self.image_label.setText("請載入 COCO JSON")
-            self.image_label.setPixmap(QPixmap())
-            self.current_pixmap = None
+            if not redraw_only:
+                self.image_label.setText("請載入 COCO JSON")
             return
         if not self.image_dir:
             self.status_label.setText(f"已載入 JSON，共 {len(self.images)} 張。請選擇圖片資料夾")
-            self.image_label.setText("請選擇圖片資料夾")
-            self.image_label.setPixmap(QPixmap())
-            self.current_pixmap = None
+            if not redraw_only:
+                self.image_label.setText("請選擇圖片資料夾")
             return
 
         img_info = self.images[self.image_index]
@@ -179,17 +174,20 @@ class CocoViewer(QMainWindow):
 
         pix = QPixmap(img_path)
         if pix.isNull():
-            self.image_label.setPixmap(QPixmap())
             self.image_label.setText(f"無法讀取圖片:\n{img_path}")
             self.status_label.setText(
                 f"{self.image_index + 1}/{len(self.images)} - {img_info.file_name} (讀取失敗)"
             )
-            self.current_pixmap = None
             return
 
         self._draw_annotations(pix, self.annos_by_image.get(img_info.id, []))
-        self.current_pixmap = pix
-        self._render_current_pixmap()
+
+        shown = pix.scaled(
+            self.image_label.size(),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation,
+        )
+        self.image_label.setPixmap(shown)
 
         count = len(self.annos_by_image.get(img_info.id, []))
         self.status_label.setText(
@@ -212,26 +210,10 @@ class CocoViewer(QMainWindow):
 
             name = self.categories.get(anno.category_id, f"cat:{anno.category_id}")
             text = f"{name}"
-            text_width = painter.fontMetrics().horizontalAdvance(text) + 10
-            label_x = int(x)
-            label_y = max(0, int(y) - 22)
-            label_bg = QColor(255, 255, 210, 235)
-            painter.fillRect(label_x, label_y, text_width, 20, label_bg)
-            painter.setPen(QColor(20, 20, 20))
-            painter.drawText(label_x + 5, label_y + 15, text)
-            painter.setPen(pen)
+            painter.fillRect(int(x), max(0, int(y) - 20), 140, 20, QColor(0, 0, 0, 150))
+            painter.drawText(int(x) + 4, max(14, int(y) - 5), text)
 
         painter.end()
-
-    def _render_current_pixmap(self) -> None:
-        if self.current_pixmap is None:
-            return
-        shown = self.current_pixmap.scaled(
-            self.image_label.size(),
-            Qt.KeepAspectRatio,
-            Qt.SmoothTransformation,
-        )
-        self.image_label.setPixmap(shown)
 
     def _color_for_category(self, category_id: int) -> QColor:
         seed = category_id * 2654435761 % 0xFFFFFF
